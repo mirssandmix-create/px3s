@@ -203,6 +203,43 @@
       `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
       `<circle cx="${X(lp.x).toFixed(1)}" cy="${Y(lp.v).toFixed(1)}" r="4" fill="${color}"/></svg>`;
   };
+  /* ราคา ณ เวลา x (จุดขั้นบันได: จุดสุดท้ายที่ไม่เกิน x) */
+  PX.valueAt = (pts, x) => {
+    let v = pts && pts.length ? pts[0].v : NaN;
+    for (const p of pts || []) { if (p.x <= x) v = p.v; else break; }
+    return v;
+  };
+  /* กราฟแบบจิ้มดูได้: เส้นขั้นบันได + พื้นจาง ๆ + จุดตรงวันที่เปลี่ยนราคา · คืน {svg, X(เวลา→px), T(px→เวลา), Y, lo, hi, x0, x1}
+     วาดในกรอบ w×h (หน่วยเดียวกับพิกเซลจริงของกล่อง ไม่ยืด) */
+  PX.chartGeom = (pts, w, h) => {
+    const xs = pts.map(p => p.x), vs = pts.map(p => p.v);
+    const x0 = Math.min.apply(null, xs), x1 = Math.max(Math.max.apply(null, xs), x0 + 1);
+    let lo = Math.min.apply(null, vs), hi = Math.max.apply(null, vs);
+    const rlo = lo, rhi = hi;
+    if (hi === lo) { const pad = Math.max(1, Math.abs(hi) * 0.05); lo -= pad; hi += pad; }
+    else { const pad = (hi - lo) * 0.15; lo -= pad; hi += pad; }
+    const L = 6, R = 6, T = 14, B = 8;
+    const X = x => L + (x - x0) / (x1 - x0) * (w - L - R);
+    const T2 = px => x0 + (Math.min(Math.max(px, L), w - R) - L) / (w - L - R) * (x1 - x0);
+    const Y = v => T + (hi - v) / (hi - lo) * (h - T - B);
+    return { X, T: T2, Y, lo: rlo, hi: rhi, x0, x1, w, h, B };
+  };
+  PX.chartSvg2 = (pts, w, h, color) => {
+    if (!pts || pts.length < 2) return "";
+    const g = PX.chartGeom(pts, w, h);
+    const line = pts.map((p, i) => (i ? "L" : "M") + g.X(p.x).toFixed(1) + " " + g.Y(p.v).toFixed(1)).join(" ");
+    const area = line + " L" + g.X(pts[pts.length - 1].x).toFixed(1) + " " + (h - g.B) + " L" + g.X(pts[0].x).toFixed(1) + " " + (h - g.B) + " Z";
+    // จุดตรงที่ราคาเปลี่ยน (คู่จุด x เดียวกัน = ขั้นบันได)
+    let dots = "";
+    for (let i = 1; i < pts.length - 1; i++) if (pts[i].x === pts[i - 1].x && pts[i].v !== pts[i - 1].v) dots += `<circle cx="${g.X(pts[i].x).toFixed(1)}" cy="${g.Y(pts[i].v).toFixed(1)}" r="3.5" fill="#fff" stroke="${color}" stroke-width="2"/>`;
+    const lp = pts[pts.length - 1];
+    return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block;width:100%;height:auto;touch-action:none" role="img" aria-label="กราฟราคา">` +
+      `<line x1="0" x2="${w}" y1="${h - g.B}" y2="${h - g.B}" stroke="currentColor" stroke-opacity=".15"/>` +
+      `<path d="${area}" fill="${color}" fill-opacity=".10"/>` +
+      `<path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>` + dots +
+      `<circle cx="${g.X(lp.x).toFixed(1)}" cy="${g.Y(lp.v).toFixed(1)}" r="4" fill="${color}"/>` +
+      `<g class="cur" style="display:none"><line class="cl" y1="0" y2="${h - g.B}" stroke="currentColor" stroke-opacity=".45" stroke-dasharray="3 3"/><circle class="cd" r="5.5" fill="${color}" stroke="#fff" stroke-width="2"/></g></svg>`;
+  };
   PX.minMax = pts => {
     if (!pts || !pts.length) return null;
     const vs = pts.map(p => p.v);

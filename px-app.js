@@ -19,6 +19,9 @@
   let posterStyle = S.get("style", "A");
   let posterUrl = "", posterBlob = null, posterFile = null, posterDirty = true;
   let saving = false;
+  let steelHide = new Set(S.get("steelHide", []) || []);   // สินค้าที่ไม่เอามาเทียบกับร้านพ่อ (จำในเครื่อง)
+  const saveHide = () => S.set("steelHide", Array.from(steelHide));
+  let steelLock = new Set(S.get("steelLock", []) || []);   // ตัวที่ล็อกราคาไว้ในระบบ (เว็บบอกตอนกดอัพเดทตามร้านพ่อ) — ไม่นับว่าต่าง
 
   /* ---------- ตัวแอพ Android (ShopAndroid) ---------- */
   const CB = {}; let N = 0;
@@ -130,9 +133,9 @@
     $("hSub").innerHTML = busy ? "กำลังดึง…" : D.at ? "อัปเดต<br>" + PX.esc(PX.when(D.at)) : "";
     $("btnRefresh").disabled = busy || Date.now() < coolUntil;
     let pills = "";
-    if (tab === "price") pills = `<button class="pill${view === "ours" ? " on" : ""}" data-v="ours">สาขา 2 + 4</button><button class="pill${view === "steel" ? " on" : ""}" data-v="steel">ร้านพ่อ (ดูอย่างเดียว)</button>`;
+    if (tab === "price") pills = `<button class="pill${view === "ours" ? " on" : ""}" data-v="ours">สาขา 2 + 4</button><button class="pill${view === "steel" ? " on" : ""}" data-v="steel">เทียบร้านพ่อ</button>`;
     if (tab === "poster") pills = Object.keys(PX.STYLES).map(k => `<button class="pill${posterStyle === k ? " on" : ""}" data-s="${k}">${PX.esc(PX.STYLES[k].name)}</button>`).join("");
-    if (tab === "hist" && histKey) pills = [[7, "7 วัน"], [30, "30 วัน"], [90, "3 เดือน"], [365, "1 ปี"]].map(r => `<button class="pill${histDays === r[0] ? " on" : ""}" data-d="${r[0]}">${r[1]}</button>`).join("");
+    if (tab === "hist" && histKey) pills = [[7, "7 วัน"], [30, "30 วัน"], [90, "3 เดือน"], [182, "6 เดือน"], [365, "1 ปี"]].map(r => `<button class="pill${histDays === r[0] ? " on" : ""}" data-d="${r[0]}">${r[1]}</button>`).join("");
     $("pills").innerHTML = pills; $("pills").classList.toggle("hidden", !pills);
     $("searchBox").classList.toggle("hidden", tab === "poster" || (tab === "hist" && !!histKey));
     $("q").placeholder = tab === "hist" ? "ค้นหาสินค้าเพื่อดูกราฟ" : "ค้นหาสินค้า";
@@ -165,16 +168,23 @@
     let h = bannerHtml();
     if (view === "steel") {
       if (D.steelError) h += `<div class="banner err">${PX.esc(D.steelError)}</div>`;
-      const rows = PX.steelRows(D, q);
-      if (D.steel) h += `<div class="lbl" style="margin:6px 2px">ราคาร้านพ่อ (ดูอย่างเดียว) · อ่านเมื่อ ${PX.esc(PX.when(D.steel.at))}</div>`;
-      h += rows.map(r => {
+      const rows = PX.steelRows(D, q).filter(r => r.key);          // เฉพาะตัวที่จับคู่กับสินค้าเราได้
+      const nDiff = rows.filter(r => !steelHide.has(r.key) && !steelLock.has(r.key) && r.ours != null && PX.r2(r.p - r.ours) !== 0).length;
+      h += `<button class="upd" id="btnSteel"${busy ? " disabled" : ""}>🔄 อัพเดทตามร้านพ่อ${nDiff ? " (ต่าง " + nDiff + " รายการ)" : ""}</button>`;
+      if (D.steel) h += `<div class="lbl" style="margin:0 2px 6px">ราคาร้านพ่ออ่านเมื่อ ${PX.esc(PX.when(D.steel.at))} · กด "ไม่เทียบ" = ไม่เอาตัวนั้นมาเทียบ/อัพเดท</div>`;
+      const row = r => {
+        const off = steelHide.has(r.key);
         const diff = r.ours == null ? null : PX.r2(r.p - r.ours);
-        const ed = r.key && edits[r.key];
-        const cmp = r.ours == null ? "ไม่มีในราคาเรา" : "ของเรา " + PX.fmt(r.ours) + (diff ? (diff > 0 ? " · ร้านพ่อสูงกว่า " : " · ร้านพ่อต่ำกว่า ") + PX.fmt(Math.abs(diff)) : " · เท่ากัน");
-        return `<div class="it"><div class="nm">${PX.esc(r.n)}<small class="${diff > 0 ? "up" : diff < 0 ? "dn" : ""}">${PX.esc(cmp)}</small></div>` +
-          (r.key && diff && !ed ? `<button class="use" data-use="${PX.esc(r.key)}" data-p="${r.p}">ใช้ราคานี้</button>` : ed ? `<span class="lbl" style="font-size:12px">แก้ไว้แล้ว</span>` : "") +
-          `<div class="sp">${PX.fmt(r.p)}</div></div>`;
-      }).join("") || `<div class="empty">${D.steel ? "ไม่พบสินค้า" : hasData ? "ยังไม่มีราคาร้านพ่อ" : "กำลังโหลด…"}</div>`;
+        const cmp = off ? "ไม่เอามาเทียบ" : "ของเรา " + PX.fmt(r.ours) + (diff ? (diff > 0 ? " · ร้านพ่อสูงกว่า " : " · ร้านพ่อต่ำกว่า ") + PX.fmt(Math.abs(diff)) : " · เท่ากัน") + (steelLock.has(r.key) && diff ? " · 🔒 ล็อกไว้ ไม่ตาม" : "");
+        return `<div class="it${off ? " off" : ""}"><div class="nm">${PX.esc(r.n)}<small class="${off ? "" : diff > 0 ? "up" : diff < 0 ? "dn" : ""}">${PX.esc(cmp)}</small></div>` +
+          `<button class="eye" data-hide="${PX.esc(r.key)}">${off ? "↩ เทียบ" : "ไม่เทียบ"}</button><div class="sp">${PX.fmt(r.p)}</div></div>`;
+      };
+      const on = rows.filter(r => !steelHide.has(r.key)), off = rows.filter(r => steelHide.has(r.key));
+      // ตัวที่ราคาต่างขึ้นก่อน
+      const live = r => PX.r2(r.p - r.ours) !== 0 && !steelLock.has(r.key);
+      on.sort((a, b) => live(b) - live(a));
+      h += on.map(row).join("") + (off.length ? `<div class="sec">ไม่เอามาเทียบ (${off.length})</div>` + off.map(row).join("") : "") ||
+        `<div class="empty">${D.steel ? "ไม่พบสินค้า" : hasData ? "ยังไม่มีราคาร้านพ่อ" : "กำลังโหลด…"}</div>`;
     } else {
       const gs = PX.groups(D, q);
       h += gs.map(g => `<div class="cat">${PX.esc(g.cat)}</div>` + g.items.map(rowHtml).join("")).join("") ||
@@ -314,23 +324,124 @@
   function renderHistOne() {
     const it = D.byKey[histKey];
     const name = it ? it.p : histKey.split("||").pop();
+    const unit = it ? it.unit : "กก.";
     $("body").innerHTML = bannerHtml() + `<button class="back" id="hBack">‹ ประวัติทั้งหมด</button>` +
-      `<div class="box"><div class="lbl">${PX.esc(name)} · ${PX.esc(it ? it.c : "")} · ราคาตอนนี้</div><div class="big">${it ? PX.fmt(it.price) : "—"} <small>บ./${PX.esc(it ? it.unit : "กก.")}</small></div>` +
+      `<div class="box"><div class="lbl">${PX.esc(name)} · ${PX.esc(it ? it.c : "")}</div>` +
+      `<div class="selhead"><div class="big" id="hVal">${it ? PX.fmt(it.price) : "—"} <small>บ./${PX.esc(unit)}</small></div><div class="when" id="hWhen">ราคาตอนนี้</div></div>` +
       `<div class="chart" id="hChart"><div class="empty">กำลังโหลด…</div></div></div><div class="box" id="hRows"></div>`;
     const hk = histKey;
     histLoad(hk).then(rows => {
       if (tab !== "hist" || !$("hChart") || histKey !== hk) return;
       const now = Date.now(), from = now - histDays * 86400000;
       const pts = PX.series(rows, it ? it.price : NaN, histDays, now);
-      const mm = PX.minMax(pts);
-      $("hChart").innerHTML = PX.chartSvg(pts, 320, 130, "#2f8a4f") +
-        `<div class="chartlbl"><span>${PX.esc(PX.shortDate(new Date(from)))}</span><span>ต่ำสุด ${PX.fmt(mm.lo)} · สูงสุด ${PX.fmt(mm.hi)}</span><span>วันนี้</span></div>`;
       const inR = rows.filter(r => PX.parseStamp(r.t) >= from);
+      drawChart(pts, from, now, unit, inR.length);
       $("hRows").innerHTML = inR.length ? inR.map(histRow(false)).join("") : `<div class="empty" style="padding:16px">ไม่มีการเปลี่ยนราคาในช่วงนี้</div>`;
     }).catch(e => {
       if (e instanceof PX.AuthError) return authLost();
       if ($("hChart")) $("hChart").innerHTML = `<div class="banner err">${PX.esc(e.message || "ดึงประวัติไม่ได้")}</div>`;
     });
+  }
+
+  /* กราฟจิ้มดู (แบบแอพหุ้น/Dime): แตะหรือลากบนกราฟ = เห็นวันที่ + ราคา ณ วันนั้นด้านบน · ปล่อยนิ้วแล้วค้างไว้ · แตะ "ราคาตอนนี้" = กลับ */
+  function drawChart(pts, from, now, unit, nChg) {
+    const box = $("hChart"); if (!box) return;
+    const W = Math.max(260, Math.round(box.clientWidth || 320)), H = 170;
+    const g = PX.chartGeom(pts, W, H);
+    const mid = from + (now - from) / 2;
+    box.innerHTML = `<div class="chartbox" id="hBox">${PX.chartSvg2(pts, W, H, "#2f8a4f")}` +
+      `<div class="ylab" style="top:${(g.Y(g.hi) - 8).toFixed(0)}px">${PX.fmt(g.hi)}</div>` + (g.hi !== g.lo ? `<div class="ylab" style="top:${(g.Y(g.lo) - 8).toFixed(0)}px">${PX.fmt(g.lo)}</div>` : "") + `</div>` +
+      `<div class="chartlbl"><span>${PX.esc(PX.shortDate(new Date(from)))}</span><span>${PX.esc(PX.shortDate(new Date(mid)))}</span><span>วันนี้</span></div>` +
+      `<div class="tip">${nChg ? "แตะหรือลากบนกราฟเพื่อดูราคาแต่ละวัน · เปลี่ยนราคา " + nChg + " ครั้งในช่วงนี้" : "ช่วงนี้ราคาไม่เปลี่ยน — ลองเลือกช่วงที่ยาวขึ้น"}</div>`;
+    const svg = box.querySelector("svg"), cur = svg.querySelector(".cur"), cl = svg.querySelector(".cl"), cd = svg.querySelector(".cd");
+    const show = ev => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * W;
+      const t = g.T(px), v = PX.valueAt(pts, t);
+      const x = g.X(t);
+      cur.style.display = ""; cl.setAttribute("x1", x); cl.setAttribute("x2", x); cd.setAttribute("cx", x); cd.setAttribute("cy", g.Y(v));
+      $("hVal").innerHTML = PX.fmt(v) + ` <small>บ./${PX.esc(unit)}</small>`;
+      const d = new Date(t);
+      $("hWhen").textContent = "วันที่ " + PX.shortDate(d) + (now - t < 60000 ? " (ตอนนี้)" : "");
+    };
+    let down = false;
+    svg.addEventListener("pointerdown", e => { down = true; try { svg.setPointerCapture(e.pointerId); } catch (x) {} show(e); });
+    svg.addEventListener("pointermove", e => { if (down) show(e); });
+    svg.addEventListener("pointerup", () => { down = false; });
+    svg.addEventListener("pointercancel", () => { down = false; });
+    $("hWhen").onclick = () => { cur.style.display = "none"; $("hVal").innerHTML = PX.fmt(PX.valueAt(pts, now)) + ` <small>บ./${PX.esc(unit)}</small>`; $("hWhen").textContent = "ราคาตอนนี้"; };
+  }
+
+  /* ---------- อัพเดทตามร้านพ่อ: ปุ่มเดียว → รายการที่ราคาต่าง (ติ๊กไว้ให้) → ยืนยัน → ราคาเราเปลี่ยนตามร้านพ่อ ----------
+     ใช้คำสั่งเดิมของเว็บ (ปุ่ม "อัพเดทราคาจากสาขา 3" ในเว็บ/โปรแกรมร้าน): priceUpdates / priceApply · ตัวที่ล็อกราคาไว้ในระบบ เว็บไม่เสนอ */
+  let SU = null;   // {r: ผลจากเว็บ, pick: Set(key)}
+  async function steelUpdate() {
+    if (busy || saving) return;
+    const b = $("btnSteel"); if (b) { b.disabled = true; b.textContent = "กำลังเทียบราคากับร้านพ่อ…"; }
+    try {
+      const r = await PX.post(cfg.url, "priceUpdates", { token: cfg.token }, 90000);
+      SU = { r, pick: new Set((r.items || []).filter(x => !steelHide.has(x.key)).map(x => x.key)) };
+      steelLock = new Set((r.lockedItems || []).map(x => x.key)); S.set("steelLock", Array.from(steelLock));
+      steelSheet();
+    } catch (e) {
+      if (e instanceof PX.AuthError) return authLost();
+      toast(e.message || "เทียบราคาไม่สำเร็จ", 4000);
+    } finally { const b2 = $("btnSteel"); if (b2) { b2.disabled = false; renderPrice(); } }
+  }
+  function steelSheet() {
+    const r = SU.r, items = r.items || [];
+    const on = items.filter(x => !steelHide.has(x.key)), off = items.filter(x => steelHide.has(x.key));
+    const row = x => {
+      const hid = steelHide.has(x.key), d = PX.r2(x.next - x.cur);
+      const it = D.byKey[x.key];
+      return `<label class="ck${hid ? " off" : ""}"><input type="checkbox" data-pick="${PX.esc(x.key)}"${SU.pick.has(x.key) ? " checked" : ""}${hid ? " disabled" : ""}>` +
+        `<div class="n">${PX.esc(x.product)}<small>${PX.esc(x.category)}${x.big ? ' · <b class="dn">⚠ ต่างเยอะ ' + PX.fmt(Math.abs(x.pct)) + "%</b>" : ""}${x.single ? " · ⚠ ตรวจกับรูปก่อน" : ""}</small></div>` +
+        `<div class="r"><span class="${d > 0 ? "up" : "dn"}">${d > 0 ? "▲" : "▼"} ${PX.fmt(Math.abs(d))}</span> ${PX.fmt(x.cur)} → <b>${PX.fmt(x.next)}</b>` +
+        `<br><button class="eye" data-hide2="${PX.esc(x.key)}" style="margin-top:3px">${hid ? "↩ เทียบ" : "ไม่เทียบ"}</button></div></label>`;
+    };
+    let html = "";
+    if (r.fallback) html += `<div class="banner">อ่านชีตร้านพ่อตรง ๆ ไม่ได้ — ใช้ราคาจากรูปใบราคาใน LINE แทน (ตรวจก่อนติ๊ก)</div>`;
+    html += on.length ? `<div class="lbl">ติ๊กตัวที่จะเปลี่ยนตามร้านพ่อ (ติ๊กไว้ให้ทุกตัว)</div>` + on.map(row).join("") : `<div class="empty" style="padding:18px">ราคาตรงกับร้านพ่อทุกตัวแล้ว 👍</div>`;
+    if (off.length) html += `<div class="sec">ไม่เอามาเทียบ (${off.length})</div>` + off.map(row).join("");
+    if (r.lockedItems && r.lockedItems.length) html += `<div class="sec">🔒 ล็อกราคาไว้ในระบบ ไม่เปลี่ยนตาม (${r.lockedItems.length}): ${PX.esc(r.lockedItems.map(x => x.product).join(", "))}</div>`;
+    if (r.checkItems && r.checkItems.length) html += `<div class="sec">⚠ อ่านไม่ชัด ไม่เสนอ (${r.checkItems.length})</div>`;
+    const n = on.filter(x => SU.pick.has(x.key)).length;
+    const sh = sheet("อัพเดทตามร้านพ่อ", `<div class="lbl" style="margin-bottom:4px">ราคาร้านพ่อ ณ ${PX.esc(PX.when(r.sheetAt || ""))}</div>` + html,
+      on.length ? [{ label: "ยกเลิก" }, { label: n ? "เปลี่ยนตามร้านพ่อ " + n + " รายการ" : "ยังไม่ได้ติ๊ก", main: true, on: () => steelApply() }] : [{ label: "ปิด", main: true }]);
+    sh.addEventListener("change", e => {
+      const k = e.target.dataset && e.target.dataset.pick; if (!k) return;
+      if (e.target.checked) SU.pick.add(k); else SU.pick.delete(k);
+      const m = on.filter(x => SU.pick.has(x.key)).length;
+      const btn = sh.querySelector('.bar [data-i="1"]'); if (btn) btn.textContent = m ? "เปลี่ยนตามร้านพ่อ " + m + " รายการ" : "ยังไม่ได้ติ๊ก";
+    });
+    sh.addEventListener("click", e => {
+      const b = e.target.closest("[data-hide2]"); if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      const k = b.dataset.hide2;
+      if (steelHide.has(k)) { steelHide.delete(k); SU.pick.add(k); } else { steelHide.add(k); SU.pick.delete(k); }
+      saveHide(); const sc = sh.querySelector(".sc").scrollTop; steelSheet(); const s2 = $("sheet"); if (s2) s2.querySelector(".sc").scrollTop = sc;
+    }, true);
+  }
+  async function steelApply() {
+    const r = SU.r;
+    const list = (r.items || []).filter(x => SU.pick.has(x.key) && !steelHide.has(x.key));
+    if (!list.length) return;
+    const sh = $("sheet"); if (sh) sh.classList.add("busy");
+    saving = true;
+    try {
+      const res = await PX.post(cfg.url, "priceApply", { token: cfg.token, sheetKey: r.sheetKey, items: list.map(x => ({ category: x.category, product: x.product, price: x.next })) }, 90000);
+      closeSheet();
+      const sk = res.skipped || [];
+      if (sk.length) sheet("เปลี่ยนแล้ว " + (res.updated || 0) + " รายการ · ข้าม " + sk.length, sk.map(s => `<div class="hrow"><div>${PX.esc(String(s).split("||").pop())}</div></div>`).join(""), [{ label: "ตกลง", main: true }]);
+      else toast("✓ เปลี่ยนตามร้านพ่อแล้ว " + (res.updated || 0) + " รายการ");
+      saving = false;
+      await refresh(true);
+    } catch (e) {
+      if (sh) sh.classList.remove("busy");
+      if (e instanceof PX.AuthError) { closeSheet(); return authLost(); }
+      toast(e instanceof PX.Offline ? "ติดต่อเว็บไม่ได้ — ตรวจราคากับเว็บก่อนกดใหม่" : (e.message || "อัพเดทไม่สำเร็จ"), 4500);
+      if (e instanceof PX.Offline) { closeSheet(); refresh(true); }
+    } finally { saving = false; }
   }
 
   /* ---------- หน้าใบราคา ---------- */
@@ -457,6 +568,9 @@
     if (nx) nx.focus(); else e.target.blur();
   });
   $("body").addEventListener("click", e => {
+    if (e.target.id === "btnSteel") { steelUpdate(); return; }
+    const hb = e.target.closest("[data-hide]");
+    if (hb) { const k = hb.dataset.hide; if (steelHide.has(k)) steelHide.delete(k); else steelHide.add(k); saveHide(); renderPrice(); return; }
     const use = e.target.closest("[data-use]");
     if (use) {
       const k = use.dataset.use;
