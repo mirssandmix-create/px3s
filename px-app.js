@@ -17,6 +17,7 @@
   let lastCheck = 0, busy = false, net = { kind: "", msg: "" };
   let histKey = "", histDays = 30, HC = {};    // ประวัติ: สินค้าที่เปิด · ช่วงวัน · แคช {key: {at, rows}}
   let posterStyle = S.get("style", "A");
+  if (!PX.SKINS[posterStyle]) posterStyle = "A";
   let posterUrl = "", posterBlob = null, posterFile = null, posterDirty = true;
   let saving = false;
   let steelHide = new Set(S.get("steelHide", []) || []);   // สินค้าที่ไม่เอามาเทียบกับร้านพ่อ (จำในเครื่อง)
@@ -134,7 +135,7 @@
     $("btnRefresh").disabled = busy || Date.now() < coolUntil;
     let pills = "";
     if (tab === "price") pills = `<button class="pill${view === "ours" ? " on" : ""}" data-v="ours">สาขา 2 + 4</button><button class="pill${view === "steel" ? " on" : ""}" data-v="steel">เทียบร้านพ่อ</button>`;
-    if (tab === "poster") pills = Object.keys(PX.STYLES).map(k => `<button class="pill${posterStyle === k ? " on" : ""}" data-s="${k}">${PX.esc(PX.STYLES[k].name)}</button>`).join("");
+    if (tab === "poster") pills = Object.keys(PX.SKINS).map(k => `<button class="pill${posterStyle === k ? " on" : ""}" data-s="${k}">${PX.esc(PX.SKINS[k])}</button>`).join("");
     if (tab === "hist" && histKey) pills = [[7, "7 วัน"], [30, "30 วัน"], [90, "3 เดือน"], [182, "6 เดือน"], [365, "1 ปี"]].map(r => `<button class="pill${histDays === r[0] ? " on" : ""}" data-d="${r[0]}">${r[1]}</button>`).join("");
     $("pills").innerHTML = pills; $("pills").classList.toggle("hidden", !pills);
     $("searchBox").classList.toggle("hidden", tab === "poster" || (tab === "hist" && !!histKey));
@@ -448,18 +449,69 @@
   async function renderPoster() {
     const stale = hasData && !PX.posterModel(D, new Date()).isToday;
     $("body").innerHTML = bannerHtml() + (stale ? `<div class="banner">⚠ ราคาในรูปเป็นของ ${PX.esc(PX.when(D.at))} (ยังไม่ได้ดึงราคาวันนี้) — กด 🔄 ก่อนส่ง</div>` : "") +
-      (hasData ? `<img class="poster" id="pImg" alt="ใบราคา"><div class="hint">ใช้หมวด/ลำดับ/ชื่อเดียวกับใบราคาในเว็บ · ราคาตามที่บันทึกล่าสุด${Object.keys(edits).length ? " <b class=\"dn\">(ที่แก้ยังไม่บันทึก ไม่อยู่ในรูป)</b>" : ""}</div>` : `<div class="empty">ยังไม่มีราคา — กด 🔄</div>`);
+      (hasData ? `<img class="posterImg" id="pImg" alt="ใบราคา"><div class="pEdit"><button class="btn" id="btnPText">✏️ แก้ข้อความในรูป</button><button class="btn" id="btnPArrow">▲▼ ลูกศรราคา</button></div><div class="hint">แตะรูปเพื่อดูเต็มจอ/ซูม · หน้าตา/หมวด/ลำดับเดียวกับใบราคาในโปรแกรมร้าน · ราคาตามที่บันทึกล่าสุด${Object.keys(edits).length ? " <b class=\"dn\">(ที่แก้ยังไม่บันทึก ไม่อยู่ในรูป)</b>" : ""}</div>` : `<div class="empty">ยังไม่มีราคา — กด 🔄</div>`);
     if (!hasData) return;
-    if (posterDirty || !posterUrl) await makePoster();
-    if ($("pImg") && posterUrl) $("pImg").src = posterUrl;
+    $("btnPText").onclick = editText;
+    $("btnPArrow").onclick = editArrows;
+    try { if (posterDirty || !posterUrl) await makePoster(); }
+    catch (e) { toast((e && e.message) || "สร้างรูปใบราคาไม่สำเร็จ", 4000); return; }
+    if ($("pImg") && posterUrl) { $("pImg").src = posterUrl; $("pImg").onclick = openZoom; }
     // iPhone: เตรียมไฟล์รูปไว้ก่อน — กด "ส่ง LINE" แล้วเปิดหน้าต่างแชร์ทันที (Safari ยอมแชร์เฉพาะทันทีหลังแตะ)
     if (!IS_ANDROID && !posterFile) { try { posterFile = new File([await getBlob()], posterName(), { type: "image/png" }); } catch (e) {} }
   }
+  /* ใบราคาแบบเดียวกับโปรแกรมร้าน: วาด HTML (poster.css) นอกจอ → html2canvas (ไฟล์ในแอพ ไม่ต้องใช้เน็ต) */
+  let H2C = null;
+  function loadH2C() {
+    if (typeof window.html2canvas === "function") return Promise.resolve(window.html2canvas);
+    if (H2C) return H2C;
+    H2C = new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "vendor/html2canvas.min.js";
+      s.onload = () => typeof window.html2canvas === "function" ? res(window.html2canvas) : rej(new Error("โหลดตัวสร้างรูปไม่ได้"));
+      s.onerror = () => { H2C = null; rej(new Error("โหลดตัวสร้างรูปไม่ได้")); };
+      document.head.appendChild(s);
+    });
+    return H2C;
+  }
+  /* มือถือตั้งตัวหนังสือเล็ก/ใหญ่ (เช่น 90%) → เว็บย่อ/ขยายตัวหนังสือในรูปด้วย = รูปเพี้ยน (ราคา/กก. โดนตัด)
+     → สลับเป็น 100% ชั่วคราวระหว่างแปลงเป็นรูป (มีม่าน "กำลังทำรูป" บังไว้) แล้วคืนค่าเดิม */
+  const sysZoom = () => { try { return IS_ANDROID && typeof ShopAndroid.textZoom === "function" ? Number(ShopAndroid.textZoom()) || 100 : 100; } catch (e) { return 100; } };
+  const setZoom = z => { try { ShopAndroid.setTextZoom(z); } catch (e) {} };
+  const frames = n => new Promise(r => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : r()); f(); });
   async function makePoster() {
+    const z = sysZoom();
+    if (z === 100) return makePoster0();
+    const cover = document.createElement("div");
+    cover.className = "pxCover"; cover.textContent = "กำลังทำรูปใบราคา…";
+    document.body.appendChild(cover);
+    setZoom(100);
+    try {
+      for (let i = 0; i < 40; i++) {   // รอเว็บใช้ขนาดใหม่จริง (สูงสุด ~2 วิ)
+        await new Promise(r => setTimeout(r, 50));
+        if (Math.abs(parseFloat(getComputedStyle(document.documentElement).fontSize) - 16) < 0.01) break;
+      }
+      await frames(2);
+      await makePoster0();
+    } finally { setZoom(0); cover.remove(); }
+  }
+  async function makePoster0() {
     await PX.fontsReady();
-    const cv = $("cv");
-    PX.drawPoster(cv, PX.posterModel(D, new Date()), posterStyle);
-    posterUrl = cv.toDataURL("image/png");
+    const h2c = await loadH2C();
+    let host = $("posterHost");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "posterHost";
+      host.setAttribute("aria-hidden", "true");
+      host.style.cssText = "position:fixed;left:-20000px;top:0;width:1560px;pointer-events:none";
+      document.body.appendChild(host);
+    }
+    host.innerHTML = `<div class="${PX.skinClass(posterStyle)}" id="pxPoster">${PX.posterHtml(D, null, new Date())}</div>`;
+    const node = $("pxPoster");
+    await Promise.all(Array.from(node.querySelectorAll("img")).map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+    const canvas = await h2c(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false, windowWidth: 1600, windowHeight: Math.max(1200, node.offsetHeight + 40), scrollX: 0, scrollY: 0 });
+    posterUrl = canvas.toDataURL("image/png");
+    host.innerHTML = "";
     posterBlob = null; posterFile = null;
     posterDirty = false;
   }
@@ -490,6 +542,166 @@
       if (e && e.name === "AbortError") return;    // กดยกเลิกหน้าต่างแชร์
       toast(e.message || "ส่งรูปไม่สำเร็จ", 4000);
     }
+  }
+
+  /* ---------- แก้ใบราคา: ข้อความบนรูป / ลูกศร → บันทึกขึ้นเว็บ (ใบเดียวกับโปรแกรมร้าน สาขา 2) ----------
+     กันทับกัน: ก่อนบันทึกดึงใบล่าสุดจากเว็บ — มีคนแก้ใบไปแล้ว (เช่นจากโปรแกรมร้าน) = ไม่บันทึก ให้ดูใหม่ก่อน */
+  async function saveLayout(L, okMsg) {
+    if (saving) return;
+    saving = true;
+    const sh = $("sheet"); if (sh) sh.classList.add("busy");
+    try {
+      const before = JSON.stringify(D.layout || null);
+      const fresh = await call("load", {}, 90000);
+      if (JSON.stringify(fresh.layout || null) !== before) {
+        S.set("data", fresh); D = PX.normalize(fresh); hasData = true; posterDirty = true; HC = {};
+        closeSheet();
+        sheet("ใบราคาเพิ่งถูกแก้จากที่อื่น", `<div class="lbl">มีคนแก้ใบราคา (เช่นจากโปรแกรมร้าน) ระหว่างนี้ — ยังไม่ได้บันทึกของคุณ · ดึงใบล่าสุดมาแล้ว ลองแก้อีกครั้ง</div>`, [{ label: "ตกลง", main: true }]);
+        render(); return;
+      }
+      await PX.post(cfg.url, "savePriceLayout", { token: cfg.token, branch: "2", layout: L }, 90000);
+      closeSheet();
+      toast(okMsg || "✓ บันทึกใบราคาแล้ว");
+      saving = false;
+      await refresh(true);
+    } catch (e) {
+      if (sh) sh.classList.remove("busy");
+      if (e instanceof PX.AuthError) { closeSheet(); authLost(); return; }
+      toast((e && e.message) || "บันทึกใบราคาไม่สำเร็จ", 4500);
+      if (e instanceof PX.Offline) { closeSheet(); refresh(true); }
+    } finally { saving = false; }
+  }
+  function editArrows() {
+    const L = PX.layoutOf(D);
+    let up = 0, dn = 0;
+    L.sections.forEach(s => (s.items || []).forEach(it => { const a = PX.layoutArrow(D, L, it); if (a === "up") up++; else if (a === "down") dn++; }));
+    const btns = [];
+    if (L.showArrows) {
+      btns.push({ label: "ล้างลูกศร", main: true, on: () => saveLayout(PX.layoutResetBase(D, PX.layoutOf(D), new Date()), "✓ ล้างลูกศรแล้ว — ราคาเปลี่ยนจากนี้ไปถึงจะขึ้นลูกศร") });
+      btns.push({ label: "ซ่อนลูกศร", on: () => { const x = PX.layoutOf(D); x.showArrows = false; saveLayout(x, "✓ ซ่อนลูกศรแล้ว"); } });
+    } else {
+      btns.push({ label: "โชว์ลูกศร", main: true, on: () => { const x = PX.layoutOf(D); x.showArrows = true; if (!x.prices || !Object.keys(x.prices).length) PX.layoutResetBase(D, x, new Date()); saveLayout(x, "✓ โชว์ลูกศรแล้ว"); } });
+    }
+    btns.push({ label: "ปิด" });
+    sheet("ลูกศรราคา ▲▼", L.showArrows
+      ? `<div class="lbl">ตอนนี้ขึ้น <b class="up">▲ ${up}</b> · <b class="dn">▼ ${dn}</b> รายการ (เทียบกับราคาวันที่ ${PX.esc(L.baseAt || "-")})</div><div class="lbl"><b>ล้างลูกศร</b> = ลูกศรหายหมด เริ่มนับใหม่จากราคาตอนนี้ (เหมือนปุ่ม "ตั้งราคาวันนี้เป็นฐาน" ในโปรแกรมร้าน)</div>`
+      : `<div class="lbl">ตอนนี้ไม่โชว์ลูกศรบนใบราคา</div>`, btns);
+  }
+  function editText() {
+    const L = PX.layoutOf(D);
+    const inp = (f, v, ph, extra) => `<input class="eIn" data-f="${f}" ${extra || ""} value="${PX.esc(v)}" placeholder="${PX.esc(ph || "")}" autocomplete="off">`;
+    let h = `<div class="lbl">แก้แค่บนรูปใบราคา — ราคา/ชื่อสินค้าจริงไม่เปลี่ยน · ช่องราคาลบให้ว่าง = ใช้ราคาจริง</div>` +
+      `<div class="eLbl">หัวใบ</div>${inp("title", L.title || "", D.shop.name || "ชื่อร้าน")}` +
+      `<div class="eLbl">ข้อความท้ายใบ</div>${inp("note", L.note == null ? PX.NOTE_DEF : L.note, "")}`;
+    L.sections.forEach((s, si) => {
+      h += `<div class="eSec">${inp("sec", s.name || "", "ชื่อหมวด", `data-si="${si}"`)}</div>`;
+      (s.items || []).forEach((it, ii) => {
+        if (!it || typeof it !== "object") return;
+        const real = PX.layoutReal(D, it);
+        const nm = it.text != null ? String(it.text) : (it.label != null && String(it.label).trim() ? String(it.label) : real.name);
+        const pr = it.text != null ? String(it.price == null ? "" : it.price) : (it.priceOv != null && String(it.priceOv).trim() ? String(it.priceOv) : real.price);
+        const a = PX.layoutArrow(D, L, it);
+        h += `<div class="eRow">${inp("name", nm, real ? real.name : "ข้อความ", `data-si="${si}" data-ii="${ii}"`)}` +
+          `${a ? `<span class="${a === "up" ? "up" : "dn"}">${a === "up" ? "▲" : "▼"}</span>` : ""}` +
+          `${inp("price", pr, real ? real.price : "", `data-si="${si}" data-ii="${ii}" class="eIn ePr"`)}</div>`;
+      });
+    });
+    sheet("✏️ แก้ข้อความในรูป", h, [{ label: "ยกเลิก" }, { label: "บันทึก", main: true, on: () => {
+      const x = PX.layoutOf(D);
+      document.querySelectorAll("#sheet .eIn").forEach(el => {
+        const f = el.dataset.f, v = el.value.replace(/\s+/g, " ").trim();
+        if (f === "title") { if (v !== String(x.title || "").replace(/\s+/g, " ").trim()) x.title = v; return; }   // ว่าง = ใช้ชื่อร้าน · ไม่แตะถ้าไม่ได้แก้
+        if (f === "note" && el.value.trim() === String(x.note == null ? PX.NOTE_DEF : x.note).trim()) return;
+        if (f === "note") { x.note = el.value.trim(); return; }
+        const s = x.sections[Number(el.dataset.si)]; if (!s) return;
+        if (f === "sec") { if (v && v !== String(el.defaultValue || "").replace(/\s+/g, " ").trim()) s.name = v; return; }
+        const it = (s.items || [])[Number(el.dataset.ii)]; if (!it) return;
+        if (v === String(el.defaultValue || "").replace(/\s+/g, " ").trim()) return;   // ไม่ได้แก้ช่องนี้ = ไม่แตะ
+        if (it.text != null) { if (f === "name") it.text = v; else it.price = v; return; }
+        const real = PX.layoutReal(D, it);
+        if (f === "name") { if (!v || v === real.name) delete it.label; else it.label = v; }
+        else { if (!v || v === real.price) delete it.priceOv; else it.priceOv = v; }
+      });
+      if (JSON.stringify(x) === JSON.stringify(PX.layoutOf(D))) { closeSheet(); toast("ไม่ได้แก้อะไร"); return; }
+      saveLayout(x, "✓ บันทึกข้อความในรูปแล้ว (โปรแกรมร้านเห็นด้วย)");
+    } }]);
+  }
+
+  /* ---------- ดูรูปใบราคาเต็มจอ: สองนิ้วถ่างซูม · นิ้วเดียวลากเลื่อน · แตะสองครั้งซูม/คืน · ✕ หรือปุ่มย้อนกลับ = ปิด ---------- */
+  function closeZoom() { const z = $("zoomV"); if (z) z.remove(); }
+  function openZoom() {
+    if (!posterUrl) return;
+    closeZoom();
+    const v = document.createElement("div");
+    v.id = "zoomV";
+    v.innerHTML = `<img alt="ใบราคา" draggable="false"><button class="zx" aria-label="ปิด">✕</button><div class="zh">ถ่างสองนิ้วเพื่อซูม · แตะสองครั้งซูม/คืน</div>`;
+    document.body.appendChild(v);
+    const img = v.querySelector("img");
+    let s = 1, x = 0, y = 0, base = 1, W = 0, H = 0;
+    const pts = new Map();
+    let start = null, lastTap = 0, moved = false;
+    const fit = () => {
+      const r = v.getBoundingClientRect(), iw = img.naturalWidth || 1, ih = img.naturalHeight || 1;
+      base = Math.min(r.width / iw, r.height / ih); W = r.width; H = r.height;
+      img.style.width = iw * base + "px"; img.style.height = ih * base + "px";
+    };
+    const clamp = () => {
+      s = Math.min(8, Math.max(1, s));
+      const iw = (img.naturalWidth || 1) * base * s, ih = (img.naturalHeight || 1) * base * s;
+      const mx = Math.max(0, (iw - W) / 2), my = Math.max(0, (ih - H) / 2);
+      x = Math.min(mx, Math.max(-mx, x)); y = Math.min(my, Math.max(-my, y));
+    };
+    const apply = () => { clamp(); img.style.transform = `translate(-50%,-50%) translate(${x}px,${y}px) scale(${s})`; };
+    /* ซูมรอบจุด (cx,cy) บนจอ — จุดใต้นิ้วอยู่ที่เดิม */
+    const zoomAt = (ns, cx, cy) => {
+      const ox = cx - W / 2, oy = cy - H / 2;
+      ns = Math.min(8, Math.max(1, ns));
+      x = ox - (ox - x) * ns / s; y = oy - (oy - y) * ns / s; s = ns; apply();
+    };
+    img.onload = () => { fit(); apply(); };
+    img.src = posterUrl;
+    if (img.complete) { fit(); apply(); }
+    const dist = () => { const a = [...pts.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+    const mid = () => { const a = [...pts.values()]; return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; };
+    v.addEventListener("pointerdown", e => {
+      if (e.target.closest(".zx")) return;
+      v.setPointerCapture(e.pointerId);
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      moved = false;
+      if (pts.size === 2) start = { d: dist(), s, m: mid(), x, y };
+      else start = { px: e.clientX, py: e.clientY, x, y };
+    });
+    v.addEventListener("pointermove", e => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size >= 2 && start && start.d) {
+        const m = mid();
+        x = start.x; y = start.y; s = start.s;
+        zoomAt(start.s * dist() / (start.d || 1), start.m.x, start.m.y);
+        x += m.x - start.m.x; y += m.y - start.m.y; apply();
+        moved = true;
+      } else if (pts.size === 1 && start && start.px != null) {
+        const dx = e.clientX - start.px, dy = e.clientY - start.py;
+        if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+        x = start.x + dx; y = start.y + dy; apply();
+      }
+    });
+    const up = e => {
+      if (!pts.has(e.pointerId)) return;
+      pts.delete(e.pointerId);
+      if (pts.size === 1) { const p = [...pts.values()][0]; start = { px: p.x, py: p.y, x, y }; return; }
+      if (pts.size) return;
+      start = null;
+      if (moved || e.type === "pointercancel") return;
+      const now = Date.now();
+      if (now - lastTap < 320) { lastTap = 0; if (s > 1.05) { s = 1; x = 0; y = 0; apply(); } else zoomAt(3, e.clientX, e.clientY); }
+      else lastTap = now;
+    };
+    v.addEventListener("pointerup", up);
+    v.addEventListener("pointercancel", up);
+    v.addEventListener("wheel", e => { e.preventDefault(); zoomAt(s * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
+    v.querySelector(".zx").addEventListener("click", closeZoom);
+    window.addEventListener("resize", () => { if ($("zoomV")) { fit(); apply(); } });
   }
 
   /* ---------- วาดทั้งหน้า ---------- */
@@ -589,6 +801,7 @@
 
   /* ปุ่มย้อนกลับของ Android: ปิดหน้าต่าง → ออกจากกราฟ → กลับหน้าราคา · true = จัดการแล้ว */
   window.appBack = () => {
+    if ($("zoomV")) { closeZoom(); return true; }
     if ($("sheet")) { closeSheet(); return true; }
     if (tab === "hist" && histKey) { histKey = ""; render(); return true; }
     if (q) { q = ""; render(); return true; }

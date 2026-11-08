@@ -10,13 +10,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex,nofollow">
-<meta name="px-version" content="2026.11.08-085341">
+<meta name="px-version" content="2026.11.08-180012">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <script>if("serviceWorker" in navigator&&location.protocol==="https:")addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});</script>
 <title>ใบราคา 3ส.</title>
 <link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="poster.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#f6f7f5;--card:#fff;--line:#e1e5e0;--tx:#1f2933;--mu:#5f6b74;--ac:#2f8a4f;--acd:#256f3f;--acs:#e3f2e7;--box:#fff;--boxb:#cfd6cf;
@@ -102,7 +103,18 @@ button{cursor:pointer;border:0;background:none}
 .chartlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--mu);margin-top:2px}
 .back{color:var(--ac);font-size:15px;padding:4px 0;margin-bottom:6px}
 /* ใบราคา */
-.poster{width:100%;border-radius:10px;border:1px solid var(--line);display:block;background:#fff}
+.posterImg{width:100%;border-radius:10px;border:1px solid var(--line);display:block;background:#fff;cursor:zoom-in}
+#zoomV{position:fixed;inset:0;z-index:40;background:#111;touch-action:none;overflow:hidden;user-select:none;-webkit-user-select:none}
+#zoomV img{position:absolute;left:50%;top:50%;transform-origin:center;max-width:none;will-change:transform}
+#zoomV .zx{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:12px;width:52px;height:52px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#111;font:inherit;font-size:24px;font-weight:700}
+#zoomV .zh{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 14px);text-align:center;color:#ddd;font-size:15px;pointer-events:none}
+.pEdit{display:flex;gap:10px;margin-top:12px}.pEdit .btn{flex:1;font-size:16px}
+.eLbl{font-size:14px;color:var(--mu,#667);margin:10px 0 4px}
+.eIn{width:100%;min-width:0;font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:inherit}
+.eSec{margin:16px 0 6px}.eSec .eIn{font-weight:700;background:#f1f6f2}
+.eRow{display:flex;align-items:center;gap:6px;margin:5px 0}.eRow .eIn{flex:1}.eRow .ePr{flex:0 0 96px;text-align:right}
+.eRow .up{color:#1b7a3e}.eRow .dn{color:#c62828}
+.pxCover{position:fixed;inset:0;z-index:50;background:#f5f5f3;display:grid;place-items:center;font-size:18px;font-weight:600;color:#444}
 .hint{font-size:13px;color:var(--mu);margin:10px 4px}
 /* หน้าต่างล่าง */
 .sheet{position:fixed;inset:0;background:rgba(20,25,30,.42);display:flex;align-items:flex-end;justify-content:center;z-index:20}

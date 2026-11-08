@@ -309,6 +309,136 @@
     };
   };
 
+  /* ---------- ใบราคาแบบเดียวกับโปรแกรมร้าน (ShopPOS pricelist.js plPosterHtml) ----------
+     HTML + poster.css ชุดเดียวกัน → html2canvas เป็นรูป · ลำดับ/ชื่อ/ลูกศรตามใบราคาในเว็บ (ที่โปรแกรมร้านซิงค์ขึ้น)
+     ตั้งค่าแบบใบของโปรแกรมร้าน (S.settings.poster) อยู่ในเครื่องร้าน ไม่ขึ้นเว็บ → ใส่ค่าเดียวกันไว้ที่นี่ */
+  PX.SKINS = { A: "สีตามหมวด", B: "ป้ายเข้ม", C: "แถบเขียวร้าน", old: "แบบเดิม" };
+  PX.POSTER_OPT = { hours: "8.00 น. - 18.00 น. ทุกวัน", line: "", pay: "", tag: "", svc: "", top: true, logo: "poster-logo.png", logoText: "3ส" };
+  PX.skinClass = s => "poster " + (s === "old" ? "poOld" : "poNew po" + (PX.SKINS[s] ? s : "A"));
+  const r3 = n => Math.round(Number(n) * 1000) / 1000;
+  let FMT_W = null;
+  const nfW = n => { try { FMT_W = FMT_W || new Intl.NumberFormat("th-TH", { maximumFractionDigits: 3 }); return FMT_W.format(r3(n)); } catch (e) { return String(r3(n)); } };
+  const unitOf = u => (/^(กก|kg|กิโล)/i.test(String(u || "").trim()) || !String(u || "").trim() ? "กก." : String(u).trim());
+  const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+  const str = v => (v == null ? "" : String(v));
+  const oneLine = v => str(v).replace(/\s+/g, " ").trim();
+  const thDate = (d, o) => { try { return d.toLocaleDateString("th-TH", o); } catch (e) { return PX.shortDate(d); } };
+  PX.posterHtml = (D, opt, now) => {
+    const o = Object.assign({}, PX.POSTER_OPT, opt || {});
+    const esc = PX.esc;
+    const L0 = D.layout && Array.isArray(D.layout.sections) ? D.layout : null;
+    const L = L0 || { title: "", note: PX.NOTE_DEF, showArrows: false, prices: {},
+      sections: D.cats.map(c => ({ name: c, items: D.items.filter(x => x.c === c).map(x => ({ cat: x.c, prod: x.p })) })) };
+    const find = it => {
+      if (!it || it.text != null) return null;
+      let x = D.byKey[PX.key(it.cat, it.prod)];
+      if (!x && typeof it.id === "string" && it.id.indexOf("||") > 0) x = D.byKey[it.id];
+      return x || null;
+    };
+    const name = it => {
+      if (it.text != null) return str(it.text);
+      if (it.label != null && str(it.label).trim() !== "") return str(it.label);
+      const f = find(it); return f ? f.p : str(it.prod);
+    };
+    const price = it => {
+      if (it.text != null) return str(it.price);
+      if (it.priceOv != null && str(it.priceOv).trim() !== "") return str(it.priceOv);
+      const f = find(it); return f ? nfW(f.price) : "—";
+    };
+    const arrow = it => {
+      if (!L.showArrows || it.text != null || it.noArrow || !L.prices) return "";
+      const f = find(it); if (!f) return "";
+      const b = L.prices[PX.key(f.c, f.p)]; if (b == null || b === "" || !isFinite(Number(b))) return "";
+      const cur = r3(f.price), base = r3(b);
+      const d = cur > base ? "up" : cur < base ? "down" : "";
+      return d ? `<span class="poArw ${d}">${d === "up" ? "▲" : "▼"}</span>` : "";
+    };
+    const secUnit = s => {
+      const cnt = {};
+      s.items.forEach(it => { const f = find(it); if (f) { const u = unitOf(f.unit); cnt[u] = (cnt[u] || 0) + 1; } });
+      let best = "กก.", bn = 0;
+      for (const u in cnt) if (cnt[u] > bn || (cnt[u] === bn && u === "กก.")) { best = u; bn = cnt[u]; }
+      return best;
+    };
+    const secs0 = L.sections.map(s => ({ name: str(s && s.name), items: (Array.isArray(s && s.items) ? s.items : []).filter(it => it && typeof it === "object") }));
+    const topPrices = n => {
+      const seen = new Set(), out = [];
+      secs0.forEach(s => s.items.forEach(it => {
+        const nm = oneLine(name(it)), p = str(price(it)).trim(), v = Number(p.replace(/,/g, ""));
+        if (!nm || !p || !isFinite(v) || v <= 0 || seen.has(nm)) return;
+        seen.add(nm);
+        const f = find(it), u = f ? unitOf(f.unit) : secUnit(s);
+        out.push({ n: nm, p, v, u: u === "กก." ? "" : u });
+      }));
+      return out.sort((a, b) => b.v - a.v).slice(0, n);
+    };
+    const secHtml = (s, si) => {
+      const u = secUnit(s), th = PX.secTheme(s.name, si);
+      return `<div class="poSec" style="--c:${th.c};--c2:${tint(th.c, .35)};--c3:${tint(th.c, .07)}"><div class="poSecHead">` +
+        `<span class="poIco">${th.ic}</span><span class="poSecName">${esc(s.name)}</span><span class="u">ราคา/${esc(u)}</span></div>` +
+        s.items.map(it => {
+          const f = find(it), uu = f ? unitOf(f.unit) : u;
+          return `<div class="poRow"><span class="poNm">${esc(name(it))}</span>` +
+            `<span class="poPr">${arrow(it)}<span class="p">${esc(price(it))}</span>${uu !== u ? `<span class="u">/${esc(uu)}</span>` : ""}</span></div>`;
+        }).join("") + "</div>";
+    };
+    const at = PX.parseStamp(D.at);
+    const d = isFinite(at) ? new Date(at) : (now || new Date());
+    const logo = str(o.logoText || "฿");
+    const logoPx = logo.length > 3 ? 28 : logo.length > 2 ? 34 : 42;
+    const title = str(L.title).trim() || D.shop.name || "ร้านรับซื้อของเก่า";
+    const addr = esc(D.shop.address || "").replace(/\n/g, "<br>");
+    const phone = str(D.shop.phone).trim();
+    const dNow = thDate(d, { day: "2-digit", month: "2-digit", year: "numeric" });
+    const dLong = thDate(d, { day: "numeric", month: "short", year: "numeric" });
+    const secs = secs0.map((s, si) => ({ s, si })).filter(x => x.s.items.length);
+    const info = [["📞", "โทร", phone], ["⏰", "เวลาเปิด", o.hours], ["💬", "LINE", o.line], ["💵", "ชำระเงิน", o.pay]].filter(x => str(x[2]).trim());
+    const top = o.top ? topPrices(5) : [];
+    const svc = str(o.svc).split(/\n/).map(x => x.trim()).filter(Boolean).slice(0, 4);
+    const tag = str(o.tag).trim();
+    return `<div class="poHead">${o.logo ? `<img class="poLogo img" src="${esc(o.logo)}" alt="">` : `<div class="poLogo" style="font-size:${logoPx}px">${esc(logo)}</div>`}` +
+      `<div class="poTitleBox"><div class="poTitle">${esc(title)}</div>${tag ? `<div class="poTag">${esc(tag)}</div>` : ""}${addr ? `<div class="poAddr">${addr}</div>` : ""}</div>` +
+      `<div class="poDateBox"><small>ราคารับซื้อวันที่</small><b>${esc(dLong)}</b></div></div>` +
+      `<div class="poMeta"><span class="poPhone">${phone ? "โทร: " + esc(phone) : ""}</span><span class="poDate">แจ้งราคาวันที่: ${esc(dNow)}</span></div>` +
+      (info.length ? `<div class="poInfo" style="--n:${info.length}">${info.map(x => `<div class="poChip"><span class="poIco">${x[0]}</span><span class="poChipT"><small>${x[1]}</small> <b>${esc(str(x[2]).trim())}</b></span></div>`).join("")}</div>` : "") +
+      (top.length ? `<div class="poTop"><span class="lbl">⭐ ราคาสูงสุดวันนี้</span>${top.map(x => `<span class="it">${esc(x.n)}<b>${esc(x.p)}${x.u ? `<small>/${esc(x.u)}</small>` : ""}</b></span>`).join("")}</div>` : "") +
+      (secs.length ? `<div class="poCols">${secs.map(x => secHtml(x.s, x.si)).join("")}</div>` : `<div class="poEmpty">ยังไม่มีสินค้าบนใบราคา</div>`) +
+      (svc.length ? `<div class="poSvc">${svc.map(x => `<span>✔ ${esc(x)}</span>`).join("")}</div>` : "") +
+      `<div class="poFoot">${esc(str(L.note).trim())}</div>`;
+  };
+
+  /* ---------- แก้ใบราคาจากแอพ (บันทึกขึ้นเว็บ = ใบเดียวกับโปรแกรมร้าน · fn savePriceLayout ของโปรแกรมร้าน) ---------- */
+  /* ใบที่ใช้อยู่ (สำเนา) — ยังไม่เคยจัดใบ = ใบตามหมวดหมู่ */
+  PX.layoutOf = D => {
+    const L = D.layout && Array.isArray(D.layout.sections) ? D.layout : null;
+    if (L) return JSON.parse(JSON.stringify(L));
+    return { title: "", note: PX.NOTE_DEF, showArrows: false, prices: {},
+      sections: D.cats.map(c => ({ name: c, items: D.items.filter(x => x.c === c).map(x => ({ cat: x.c, prod: x.p })) })).filter(s => s.items.length) };
+  };
+  /* ชื่อ/ราคาจริงของแถว (ไม่นับที่แก้บนรูป) — แถวข้อความ = null */
+  PX.layoutReal = (D, it) => {
+    if (!it || it.text != null) return null;
+    const f = D.byKey[PX.key(it.cat, it.prod)] || null;
+    return { name: f ? f.p : str(it.prod), price: f ? nfW(f.price) : "—", found: !!f };
+  };
+  /* ล้างลูกศร: ราคาตอนนี้ = ราคาฐานใหม่ (เหมือนปุ่ม "ตั้งราคาวันนี้เป็นฐาน" ในโปรแกรมร้าน) */
+  PX.layoutResetBase = (D, L, now) => {
+    L.prices = {};
+    D.items.forEach(x => { if (isFinite(Number(x.price))) L.prices[PX.key(x.c, x.p)] = Number(x.price); });
+    const d = now || new Date();
+    L.baseAt = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    L.sections.forEach(s => (s.items || []).forEach(it => { if (it) delete it.noArrow; }));
+    return L;
+  };
+  /* แถวนี้ขึ้นลูกศรไหม: "up" / "down" / "" */
+  PX.layoutArrow = (D, L, it) => {
+    if (!L.showArrows || !it || it.text != null || it.noArrow || !L.prices) return "";
+    const f = D.byKey[PX.key(it.cat, it.prod)]; if (!f) return "";
+    const b = L.prices[PX.key(f.c, f.p)]; if (b == null || b === "" || !isFinite(Number(b))) return "";
+    const cur = r3(f.price), base = r3(b);
+    return cur > base ? "up" : cur < base ? "down" : "";
+  };
+
   /* วาดใบราคาลง canvas — style A สีตามหมวด (พื้นขาว) · B ป้ายเข้ม · C แถบเขียวร้าน
      วาดเองทั้งหมด (ไม่พึ่งตัวแปลงหน้าเว็บเป็นรูป) · ฟอนต์ Prompt ต้องโหลดก่อน (PX.fontsReady) */
   PX.STYLES = {

@@ -1,0 +1,136 @@
+/* ใบราคา — คัดลอกจากโปรแกรมร้าน ShopPOS www/pricelist.css (กฎ .poster) ให้รูปออกมาเหมือนกันทุกจุด
+   แก้หน้าตาใบราคา = แก้ที่โปรแกรมร้านก่อน แล้วคัดลอกมาใหม่ */
+/* กันสไตล์ของหน้าแอพ (index.html: .u .it .lbl .up · body line-height 1.4) ไหลเข้ารูป — ให้เหมือนหน้าโปรแกรมร้าน (body 600 · line-height ปกติ) */
+.poster{line-height:normal;font-weight:600}
+.poster .u{width:auto;line-height:inherit;font-size:inherit;color:inherit}
+.poster .it{background:none;border:0;border-radius:0;padding:0;margin:0;display:inline;gap:0}
+.poster .lbl{font-size:inherit;color:inherit}
+.poster .up,.poster .dn{color:inherit}
+.poster{width:1560px;background:#fff;color:#101010;font-family:'Prompt','Noto Sans Thai','Leelawadee UI',Tahoma,sans-serif;padding:36px 40px 0}
+.poster *{box-sizing:border-box}
+.poster .poHead{display:flex;align-items:center;gap:26px;border-bottom:3px solid #1a237e;padding-bottom:20px}
+.poster .poLogo{width:120px;height:120px;border-radius:50%;flex:0 0 auto;border:3px solid #1a237e;background:#fff;display:grid;place-items:center;font-size:42px;font-weight:900;color:#1b7a3e;overflow:hidden;text-align:center;line-height:1}
+.poster .poTitleBox{flex:1;min-width:0}
+.poster .poTitle{font-size:46px;font-weight:900;color:#1b7a3e;line-height:1.15;letter-spacing:.5px}
+.poster .poAddr{font-size:20px;font-weight:500;margin-top:6px;line-height:1.4;color:#222}
+.poster .poMeta{display:flex;justify-content:space-between;align-items:center;gap:20px;font-size:22px;font-weight:800;padding:12px 2px}
+.poster .poPhone{color:#101010}
+.poster .poDate{color:#c62828;font-size:20px;margin-left:auto}
+.poster .poCols{column-count:4;column-gap:18px}
+.poster .poSec{break-inside:avoid;page-break-inside:avoid;margin-bottom:14px;border:1.5px solid #1a237e;overflow:hidden;background:#fff}
+.poster .poSecHead{display:flex;align-items:center;font-size:19px;font-weight:800;padding:6px 12px;color:#fff;background:#1a237e}
+.poster .poSecName{flex:0 1 auto;min-width:20px}
+.poster .poSecHead .u{margin-left:auto;padding-left:10px;font-size:14px;font-weight:600;color:#dfe3ff;white-space:nowrap}
+.poster .poRow{display:flex;align-items:baseline;padding:5px 12px;font-size:18px;font-weight:500;color:#101010;border-top:1px solid #1a237e}
+.poster .poNm{flex:1;min-width:20px;overflow-wrap:anywhere}
+.poster .poPr{display:flex;align-items:baseline;white-space:nowrap;margin-left:10px}
+.poster .poRow .p{font-weight:800;font-size:19px;color:#101010;min-width:20px;text-align:right}
+.poster .poRow .u{font-size:13px;font-weight:600;color:#444;margin-left:2px}
+.poster .poArw{font-size:15px;margin-right:8px;user-select:none}
+.poster .poArw.up{color:#1b7a3e}
+.poster .poArw.down{color:#c62828}
+.poster .poEmpty{border:2px dashed #9aa0b8;color:#555b70;text-align:center;font-size:24px;font-weight:600;padding:60px 20px;margin:10px 0}
+.poster .poFoot{background:#1a237e;color:#fff;text-align:center;font-size:21px;font-weight:800;padding:12px;margin:20px -40px 0;min-height:56px}
+.poster img.poLogo{border:0;background:transparent;object-fit:contain}
+.poster .poDateBox,.poster .poInfo,.poster .poTop,.poster .poSvc,.poster .poTag,.poster .poIco{display:none}
+.poster.poNew{padding:0;background:#fff;color:#1d2433;overflow:hidden}
+.poster.poNew .poHead{border-bottom:0;padding:30px 36px 0;gap:24px}
+.poster.poNew .poLogo{border:0;width:118px;height:118px}
+.poster.poNew .poTitle{font-size:50px;font-weight:700;letter-spacing:0}
+.poster.poNew .poTag{display:block;font-size:20px;font-weight:600;margin-top:2px}
+.poster.poNew .poAddr{font-size:19px;font-weight:600}
+.poster.poNew .poAddr::before{content:"📍 "}
+.poster.poNew .poMeta{display:none}
+.poster.poNew .poDateBox{display:block;flex:0 0 auto;text-align:center;border-radius:18px;padding:12px 26px}
+.poster.poNew .poDateBox small{display:block;font-size:16px;font-weight:600}
+.poster.poNew .poDateBox b{display:block;font-size:30px;font-weight:700;line-height:1.2;white-space:nowrap}
+.poster.poNew .poInfo{display:flex;flex-wrap:wrap;gap:10px;padding:18px 36px 0}
+.poster.poNew .poChip{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600}
+.poster.poNew .poChip .poIco{display:inline-grid;place-items:center;flex:0 0 auto}
+.poster.poNew .poChip small{font-size:inherit;font-weight:600}
+.poster.poNew .poTop{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:14px 36px 0;padding:10px 16px;border-radius:14px;font-size:18px;font-weight:600}
+.poster.poNew .poTop .lbl{font-weight:700;white-space:nowrap}
+.poster.poNew .poTop .it{border-radius:10px;padding:4px 12px;white-space:nowrap;border:1px solid}
+.poster.poNew .poTop .it b{margin-left:6px}
+.poster.poNew .poTop .it small{font-size:13px;margin-left:1px}
+.poster.poNew .poCols{padding:16px 36px 0;column-gap:18px}
+.poster.poNew .poEmpty{margin:16px 36px}
+.poster.poNew .poSec{border:1px solid var(--c2);border-radius:14px;margin-bottom:16px;background:#fff}
+.poster.poNew .poSecHead{gap:10px;font-size:20px;font-weight:700;padding:8px 14px;background:var(--c);color:#fff}
+.poster.poNew .poSecHead .poIco{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22);font-size:17px;flex:0 0 auto}
+.poster.poNew .poSecHead .u{color:rgba(255,255,255,.88);font-size:13px}
+.poster.poNew .poRow{border-top:0;padding:6px 14px;font-size:18px;font-weight:600;color:#1d2433}
+.poster.poNew .poRow .p{font-size:20px;font-weight:700;color:#1d2433}
+.poster.poNew .poRow .u{color:#5b6475}
+.poster.poNew .poSvc{display:flex;justify-content:center;flex-wrap:wrap;gap:12px 34px;padding:4px 36px 14px;font-size:18px;font-weight:600}
+.poster.poNew .poFoot{margin:0;padding:14px 36px;font-size:20px;font-weight:700;min-height:0}
+.poster.poA .poTitle{color:#1b7a3e}
+.poster.poA .poTag{color:#1b7a3e}
+.poster.poA .poAddr{color:#4a5263}
+.poster.poA .poDateBox{background:#1b7a3e;color:#fff}
+.poster.poA .poChip{background:#f1f6f2;border:1px solid #d5e6da;border-radius:999px;padding:7px 16px}
+.poster.poA .poChip small{color:#4a5263}
+.poster.poA .poChip b{color:#14612f}
+.poster.poA .poTop{background:linear-gradient(90deg,#fff6e8,#fff);border:1px solid #f3d7a8}
+.poster.poA .poTop .lbl,.poster.poA .poTop .it b{color:#9a4a22}
+.poster.poA .poTop .it{background:#fff;border-color:#f0d9b5}
+.poster.poA .poRow:nth-child(odd){background:var(--c3)}
+.poster.poA .poRow .p{color:var(--c)}
+.poster.poA .poSvc{color:#14612f}
+.poster.poA .poFoot{background:#1b7a3e;color:#fff}
+.poster.poB{background:#0f1b2d radial-gradient(1200px 600px at 10% 0%,#1d3557 0%,#0f1b2d 60%);color:#eef2f7}
+.poster.poB .poHead{margin:0 36px;padding:30px 0 18px;border-bottom:1px solid rgba(255,255,255,.14)}
+.poster.poB img.poLogo,.poster.poB .poLogo{background:#fff;border-radius:50%;padding:4px}
+.poster.poB .poTitle{color:#fff}
+.poster.poB .poTag,.poster.poB .poAddr{color:#b8c4d6}
+.poster.poB .poDateBox{text-align:right;padding:0}
+.poster.poB .poDateBox small{color:#b8c4d6}
+.poster.poB .poDateBox b{color:#ffc66d;font-size:34px}
+.poster.poB .poInfo{gap:12px 30px;padding:14px 36px 0}
+.poster.poB .poChip{color:#d6deea;font-size:19px}
+.poster.poB .poChip b{color:#ffc66d}
+.poster.poB .poTop{background:rgba(255,198,109,.08);border:1px solid rgba(255,198,109,.3);color:#eef2f7}
+.poster.poB .poTop .lbl{color:#ffc66d}
+.poster.poB .poTop .it{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14)}
+.poster.poB .poTop .it b{color:#ffd58a}
+.poster.poB .poSec{background:#16263d;border:1px solid rgba(255,255,255,.08);border-top:5px solid var(--c)}
+.poster.poB .poSecHead{background:transparent;color:#fff;padding:9px 14px 6px;font-size:21px}
+.poster.poB .poSecHead .poIco{border-radius:10px;background:var(--c)}
+.poster.poB .poSecHead .u{color:#9fb0c6}
+.poster.poB .poRow{color:#e3e9f2;border-top:1px solid rgba(255,255,255,.07)}
+.poster.poB .poRow .p{color:#ffd58a;font-size:21px}
+.poster.poB .poRow .u{color:#9fb0c6}
+.poster.poB .poArw.up{color:#7ddc9a}
+.poster.poB .poArw.down{color:#ff8a80}
+.poster.poB .poEmpty{color:#c9d3e0;border-color:#51607a}
+.poster.poB .poSvc{color:#d6deea}
+.poster.poB .poFoot{background:#0b1422;color:#ffc66d}
+.poster.poC{background:#f6f8f5}
+.poster.poC .poHead{background:#1b7a3e linear-gradient(115deg,#145c30 0%,#1b7a3e 45%,#2e9d5b 100%);color:#fff;padding:26px 36px}
+.poster.poC img.poLogo,.poster.poC .poLogo{background:#fff;border-radius:50%;padding:5px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.poster.poC .poTitle{color:#fff;font-size:52px}
+.poster.poC .poTag{color:#fff}
+.poster.poC .poAddr{color:#e6f4ea}
+.poster.poC .poDateBox{background:#fff;color:#145c30;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+.poster.poC .poDateBox small{color:#4a5263}
+.poster.poC .poInfo{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:12px;padding:16px 36px 0}
+.poster.poC .poChip{background:#fff;border:1px solid #e1e8e0;border-radius:14px;padding:10px 14px;gap:12px;color:#4a5263;font-size:17px;min-width:0}
+.poster.poC .poChip .poIco{width:40px;height:40px;border-radius:12px;background:#e7f3ea;font-size:20px}
+.poster.poC .poChipT{min-width:0}
+.poster.poC .poChip small{display:block;font-size:16px}
+.poster.poC .poChip b{display:block;color:#1d2433;font-size:18px;overflow-wrap:anywhere}
+.poster.poC .poTop{background:#fff;border:1px solid #d5e6da}
+.poster.poC .poTop .lbl{color:#14612f}
+.poster.poC .poTop .it{background:#f1f6f2;border-color:#d5e6da}
+.poster.poC .poTop .it b{color:#14612f}
+.poster.poC .poSec{border:1px solid #e1e8e0;border-radius:16px;box-shadow:0 2px 6px rgba(20,40,30,.05)}
+.poster.poC .poSecHead{background:var(--c3);color:var(--c);border-bottom:2px solid var(--c);padding:10px 14px}
+.poster.poC .poSecHead .poIco{background:var(--c);color:#fff;width:32px;height:32px;font-size:16px}
+.poster.poC .poSecHead .u{color:#5b6475}
+.poster.poC .poRow{border-top:1px solid #eef1ed}
+.poster.poC .poSecHead+.poRow{border-top:0}
+.poster.poC .poSvc{color:#14612f}
+.poster.poC .poFoot{background:#145c30;color:#fff}
+/* แอพมือถือเท่านั้น: กันมือถือขยายตัวหนังสือเอง (จอแคบ) ตอนแปลงเป็นรูป — ไม่งั้น "ราคา/กก." หัวหมวดโดนตัด */
+.poster{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.poster .poSecHead .u{flex:0 0 auto}

@@ -1,7 +1,7 @@
 /* ใบราคา 3ส. (เว็บแอพ): มีเน็ต = ใช้ไฟล์ล่าสุดจากเว็บเสมอ (แล้วจำไว้) · ไม่มีเน็ต = ใช้ไฟล์ที่จำไว้ → เปิดแอพดูราคาล่าสุดได้
    ไม่แตะคำขอไปเว็บ Google (ดึง/บันทึกราคา) */
-var V = "px-2026.11.08-085341-0415d350bd";
-var FILES = ["./", "fonts/fonts.css", "fonts/prompt-400-latin.woff2", "fonts/prompt-400-thai.woff2", "fonts/prompt-600-latin.woff2", "fonts/prompt-600-thai.woff2", "fonts/prompt-700-latin.woff2", "fonts/prompt-700-thai.woff2", "icon-180.png", "icon-192.png", "icon-512.png", "index.html", "manifest.webmanifest", "px-app.js", "px-core.js"];
+var V = "px-2026.11.08-180012-74fd7244d5";
+var FILES = ["./", "fonts/fonts.css", "fonts/prompt-400-latin.woff2", "fonts/prompt-400-thai.woff2", "fonts/prompt-600-latin.woff2", "fonts/prompt-600-thai.woff2", "fonts/prompt-700-latin.woff2", "fonts/prompt-700-thai.woff2", "icon-180.png", "icon-192.png", "icon-512.png", "index.html", "manifest.webmanifest", "poster-logo.png", "poster.css", "px-app.js", "px-core.js", "vendor/html2canvas.min.js"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
 });
